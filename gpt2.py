@@ -8,44 +8,44 @@ import requests
 '''
 params
 '''
-batch_size = 16,
-block_size = 32,
+batch_size = 16
+block_size = 32
 learning_rate = 1e-3
 max_iters = 5000
 eval_iters = 200
 eval_interval = 100
 n_embd = 64
 n_heads = 4
-n_layers = 6
+n_layers = 4
 dropout = 0.3
 
 
 
 def encode(s):
-    return [stoi(c) for c in s]
+    return [stoi[c] for c in s]
 def decode(s):
-    return ''.join([itos(i) for i in s])
+    return ''.join([itos[i] for i in s])
 
 def get_batch(split):
     data = train_data if split == 'train' else val_data
     ix = torch.randint(len(data) - block_size, (batch_size, ))
     xb = torch.stack([data[i:i+block_size] for i in ix])
-    yb = torch.stack([data[i:i+block_size] for i in ix])
+    yb = torch.stack([data[i+1:i+block_size+1] for i in ix])
     return xb, yb
 
 @torch.no_grad
 def estimate_loss():
     out = {}
-    model.eval()
+    m.eval()
 
     for split in ['train', 'val']:
         losses = torch.zeros(eval_iters)
         for i in range(eval_iters):
             xb, yb = get_batch(split)
-            logits, loss = model(xb,yb)
+            logits, loss = m(xb,yb)
             losses[i] = loss.item()
         out[split] = losses.mean()
-    model.train()
+    m.train()
     return out
 
 class Head(nn.Module):
@@ -67,14 +67,14 @@ class Head(nn.Module):
         v = self.value(x)
 
         wei = q @ k.transpose(-1,-2) * C ** -0.5
-        wei = wei.masked_fill(tril[:T, :T] == 0, float('-inf'))
+        wei = wei.masked_fill(self.tril[:T, :T] == 0, float('-inf'))
         wei = F.softmax(wei, dim=-1)
         wei = self.dropout(wei)
         out = wei @ v
         return out
 
 
-class MultiHeadAttention:
+class MultiHeadAttention(nn.Module):
     ''' this implemets several attention heads '''
     def __init__(self, n_embd, n_heads):
         super().__init__()
@@ -85,13 +85,13 @@ class MultiHeadAttention:
 
 
     def forward(self, x):
-        out = torch.stack([head(x) for head in self.heads])
+        out = torch.cat([head(x) for head in self.heads], dim=-1)
         out = self.proj(out)
         out = self.dropout(out)
 
         return out
 
-class FeedForward:
+class FeedForward(nn.Module):
     ''' simple feed forward nn '''
 
     def __init__(self, n_embd):
@@ -109,7 +109,7 @@ class FeedForward:
     
 
 
-class Block:
+class Block(nn.Module):
 
     def __init__(self, n_embd, n_heads):
         super().__init__()
@@ -123,19 +123,20 @@ class Block:
         x = x + self.ffwd(self.ln2(x))
         return x
     
-class LanguageModel:
+class LanguageModel(nn.Module):
 
     def __init__(self, n_layers, n_embd, n_heads):
+        super().__init__()
         self.token_embs = nn.Embedding(vocab_size, n_embd)
         self.pos_embs = nn.Embedding(block_size, n_embd)
-        self.blocks = nn.Sequential(*[Block(n_embd, n_heads) for _ in n_layers])
+        self.blocks = nn.Sequential(*[Block(n_embd, n_heads) for _ in range(n_layers)])
         self.lnf = nn.LayerNorm(n_embd)
         self.lm_head = nn.Linear(n_embd, vocab_size)
 
     def forward(self, x, targets=None):
-
+        B, T = x.shape
         token_embs = self.token_embs(x)
-        pos_embs = self.pos_embs(x)
+        pos_embs = self.pos_embs(torch.arange(T))
         x = token_embs + pos_embs
         x = self.blocks(x)
         x = self.lnf(x)
@@ -143,7 +144,7 @@ class LanguageModel:
         loss = None
 
         if targets != None:
-            B, T, C = x.shape
+            B, T, C = logits.shape
             logits = logits.reshape(B*T, C)
             targets = targets.reshape(B*T)
             loss = F.cross_entropy(logits, targets)
@@ -152,10 +153,10 @@ class LanguageModel:
     
     def generate(self, idx, max_tokens):
 
-        context = idx[:,-block_size:,:]
+        context = idx[:,-block_size:]
         logits, _ = self.forward(context)
 
-        logits = logits[:,-1:,:]
+        logits = logits[:,-1,:]
         probs = F.softmax(logits, dim=-1)
         new_token = torch.multinomial(probs, num_samples=1)
 
@@ -169,7 +170,8 @@ url = "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshake
 
 # Download the dataset
 response = requests.get(url)
-file.write(response.text)
+with open("input.txt", "w", encoding="utf-8") as file:
+    file.write(response.text)
 
 with open('input.txt', 'r') as f:
     data = f.read()
@@ -180,11 +182,12 @@ vocab_size = len(vocab)
 stoi = {s:i for i,s in enumerate(vocab)}
 itos = {i:s for i,s in enumerate(vocab)}
 
+data = torch.tensor(encode(data))
 n = int(len(data)*0.9)
 train_data = data[:n]
 val_data = data[n:]
 
-m = LanguageModel()
+m = LanguageModel(n_layers, n_embd, n_heads)
 optimizer = torch.optim.AdamW(m.parameters(), lr=learning_rate)
 
 for iter in range(max_iters):
@@ -203,7 +206,7 @@ context = torch.tensor([[20]])
 for _ in range(int(1e3)):
     context = context[:,-block_size:]
     new_token = m.generate(context, max_tokens=1)
-    print(decode(new_token.tolist()))
+    print(decode(new_token.tolist()[0][-1:]))
     context = torch.cat([context,new_token], dim=-1)
 
 
