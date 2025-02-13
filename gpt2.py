@@ -32,7 +32,7 @@ def get_batch(split):
     ix = torch.randint(len(data) - block_size, (batch_size, ))
     xb = torch.stack([data[i:i+block_size] for i in ix])
     yb = torch.stack([data[i+1:i+block_size+1] for i in ix])
-    xb, yb = xb.to(device), y.to(device)
+    xb, yb = xb.to(device), yb.to(device)
     return xb, yb
 
 @torch.no_grad
