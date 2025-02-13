@@ -169,6 +169,7 @@ url = "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshake
 
 # Download the dataset
 response = requests.get(url)
+file.write(response.text)
 
 with open('input.txt', 'r') as f:
     data = f.read()
