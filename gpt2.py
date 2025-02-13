@@ -202,6 +202,10 @@ for iter in range(max_iters):
     loss.backward()
     optimizer.step()
 
+torch.save(m, "model_full.pt")
+m = torch.load("model_full.pt")
+m.eval()  # Set the model to evaluation mode if needed
+
 context = torch.tensor([[20]])
 for _ in range(int(1e3)):
     context = context[:,-block_size:]
