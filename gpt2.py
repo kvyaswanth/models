@@ -68,7 +68,7 @@ class Head(nn.Module):
         q = self.query(x)
         v = self.value(x)
 
-        wei = q @ k.transpose(-1,-2) * C ** -0.5
+        wei = q @ k.transpose(-1,-2) * (C ** -0.5) # head_size ** -0.5
         wei = wei.masked_fill(self.tril[:T, :T] == 0, float('-inf'))
         wei = F.softmax(wei, dim=-1)
         wei = self.dropout(wei)
@@ -138,14 +138,14 @@ class LanguageModel(nn.Module):
     def forward(self, x, targets=None):
         B, T = x.shape
         token_embs = self.token_embs(x)
-        pos_embs = self.pos_embs(torch.arange(T))
+        pos_embs = self.pos_embs(torch.arange(T, device=x.device))
         x = token_embs + pos_embs
         x = self.blocks(x)
         x = self.lnf(x)
         logits = self.lm_head(x)
         loss = None
 
-        if targets != None:
+        if targets is not None:
             B, T, C = logits.shape
             logits = logits.reshape(B*T, C)
             targets = targets.reshape(B*T)
@@ -155,14 +155,16 @@ class LanguageModel(nn.Module):
     
     def generate(self, idx, max_tokens):
 
-        context = idx[:,-block_size:]
-        logits, _ = self.forward(context)
+        for _ in range(max_tokens):
 
-        logits = logits[:,-1,:]
-        probs = F.softmax(logits, dim=-1)
-        new_token = torch.multinomial(probs, num_samples=1)
+            context = idx[:,-block_size:]
+            logits, _ = self.forward(context)
 
-        context = torch.cat([context, new_token], dim=-1)
+            logits = logits[:,-1,:]
+            probs = F.softmax(logits, dim=-1)
+            new_token = torch.multinomial(probs, num_samples=1)
+
+            context = torch.cat([context, new_token], dim=-1)
 
         return context
 
@@ -206,10 +208,11 @@ for iter in range(max_iters):
     optimizer.step()
 
 torch.save(m, "model_full.pt")
-m = torch.load("model_full.pt")
+m = torch.load("model_full.pt", map_location=device)
+m.to(device)
 m.eval()  # Set the model to evaluation mode if needed
 
-context = torch.tensor([[20]])
+context = torch.tensor([[20]], device=device)
 for _ in range(int(1e3)):
     context = context[:,-block_size:]
     new_token = m.generate(context, max_tokens=1)
