@@ -192,7 +192,7 @@ for iter in range(max_iters):
 
     if iter % eval_interval == 0 or iter == max_iters - 1:
         losses = estimate_loss()
-        print(f'at {iter} iteration -- train loss: {losses['train']}, val loss: {losses['val']}')
+        print(f'at {iter} iteration -- train loss: {losses["train"]}, val loss: {losses["val"]}')
 
     optimizer.zero_grad(set_to_none=True)
     loss.backward()
