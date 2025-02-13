@@ -191,24 +191,24 @@ n = int(len(data)*0.9)
 train_data = data[:n]
 val_data = data[n:]
 
-m = LanguageModel(n_layers, n_embd, n_heads)
-m = m.to(device)
-optimizer = torch.optim.AdamW(m.parameters(), lr=learning_rate)
+# m = LanguageModel(n_layers, n_embd, n_heads)
+# m = m.to(device)
+# optimizer = torch.optim.AdamW(m.parameters(), lr=learning_rate)
 
-for iter in range(max_iters):
-    x, y = get_batch('train')
-    logits, loss = m(x, y)
+# for iter in range(max_iters):
+#     x, y = get_batch('train')
+#     logits, loss = m(x, y)
 
-    if iter % eval_interval == 0 or iter == max_iters - 1:
-        losses = estimate_loss()
-        print(f'at {iter} iteration -- train loss: {losses["train"]}, val loss: {losses["val"]}')
+#     if iter % eval_interval == 0 or iter == max_iters - 1:
+#         losses = estimate_loss()
+#         print(f'at {iter} iteration -- train loss: {losses["train"]}, val loss: {losses["val"]}')
 
-    optimizer.zero_grad(set_to_none=True)
-    loss.backward()
-    optimizer.step()
+#     optimizer.zero_grad(set_to_none=True)
+#     loss.backward()
+#     optimizer.step()
 
-torch.save(m, "model_full.pt")
-m = torch.load("model_full.pt", map_location=device)
+# torch.save(m, "model_full.pt")
+m = torch.load("model_full.pt", map_location=device, weights_only=False)
 m.to(device)
 m.eval()  # Set the model to evaluation mode if needed
 
