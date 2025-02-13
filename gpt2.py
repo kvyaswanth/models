@@ -206,7 +206,7 @@ context = torch.tensor([[20]])
 for _ in range(int(1e3)):
     context = context[:,-block_size:]
     new_token = m.generate(context, max_tokens=1)
-    print(decode(new_token.tolist()[0][-1:]))
+    print(decode(new_token.tolist()[0][-1:]), end='')
     context = torch.cat([context,new_token], dim=-1)
 
 
